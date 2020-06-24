@@ -9,7 +9,7 @@ getStateGDP <- function(year) {
 }
 
 #' Map state table to BEA Summary, mark sectors that need allocation
-#' @param statetablename Name of pre-saved state table, canbe GDP, Tax, Employment Compensation, and GOS.
+#' @param statetablename Name of pre-saved state table, can be GDP, Tax, Employment Compensation, and GOS.
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains state value for all states with row names being BEA sector code.
 mapStateTabletoBEASummary <- function(statetablename, year) {

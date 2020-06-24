@@ -150,7 +150,7 @@ calculateStateUSPCERatio <- function(year) {
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains state household demand for all states at a specific year at BEA Summary level.
 estimateStateHouseholdDemand <- function(year) {
-  US_Summary_Use <- get(paste("Summary_Use", year, "PRO_BeforeRedef", sep = "_"), as.environment("package:useeior"))
+  US_Summary_Use <- get(paste("Summary_Use", year, "PRO_BeforeRedef", sep = "_"))*1E6
   US_HouseholdDemand <- US_Summary_Use[Commodities, HouseholdDemandCodes, drop = FALSE]
   PCE_ratio <- calculateStateUSPCERatio(year)
   State_HouseholdDemand <- data.frame()
@@ -269,7 +269,7 @@ calculateStateLocalGovExpenditureRatio <- function(year) {
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains state household demand for all states at a specific year at BEA Summary level.
 estimateStatePrivateInvestment <- function(year) {
-  US_Summary_Use <- get(paste("Summary_Use", year, "PRO_BeforeRedef", sep = "_"), as.environment("package:useeior"))
+  US_Summary_Use <- get(paste("Summary_Use", year, "PRO_BeforeRedef", sep = "_"))*1E6
   US_PrivateInvestment <- US_Summary_Use[Commodities, c(InvestmentDemandCodes, ChangeInventories), drop = FALSE]
   # Separate US_PrivateInvestment into Residential (F02R) and NonResidential (F02S, F02E, F02N, and F030)
   US_ResidentialInvestment <- US_PrivateInvestment[Commodities, "F02R", drop = FALSE]

@@ -51,3 +51,24 @@ unlist(State_CommInputTotal_list) - colSums(US_Summary_UseTransaction)
 State_Value_Added <- assembleStateValueAdded(year)
 State_Summary_Use <- rbind(State_Summary_UseTransaction, State_Value_Added)
 State_Summary_Use <- State_Summary_Use[order(rownames(State_Summary_Use)), ]
+
+#' 8 - Apply RAS to PCE
+State_PCE <- estimateStateHouseholdDemand(year)
+State_PCE[, "BEA_2012_Summary_Code"] <- gsub("\\..*", "", rownames(State_PCE))
+State_PCE[, "State"] <- gsub(".*\\.", "", rownames(State_PCE))
+State_PCE <- reshape2::dcast(State_PCE, BEA_2012_Summary_Code ~ State, value.var = "F010")
+m0 <- State_PCE[, -1]
+t_r <- US_Summary_Use[, "F010"]
+t_c <- as.numeric(colSums(US_Summary_MakeTransaction))
+# Adjust t_c/t_r, make sum(t_c)==sum(t_r)
+if (sum(t_c) > sum(t_r)) {
+  t_r <- (t_r/sum(t_r))*sum(t_c)
+} else {
+  t_c <- (t_c/sum(t_c))*sum(t_r)
+}
+t <- ToleranceforRAS(t_r, t_c, NULL, 1E6)
+State_Summary_MakeTransaction_balanced <- RAS(m0, t_r, t_c, t, max_itr = 1E6)
+colnames(State_Summary_MakeTransaction_balanced) <- colnames(m0)
+
+#' 9 - Apply RAS to state and local gov expenditure
+#' 10 - Apply RAS to federal gov expenditure
