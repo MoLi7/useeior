@@ -167,6 +167,42 @@ estimateStateHouseholdDemand <- function(year) {
   return(State_HouseholdDemand)
 }
 
+#' Estimate state private investment at BEA Summary level.
+#' Apply state PCE ratio to F02R.
+#' Apply state Gross Output ratio to F02S, F02E, F02N, and F030.
+#' @param year A numeric value between 2007 and 2017 specifying the year of interest.
+#' @return A data frame contains state household demand for all states at a specific year at BEA Summary level.
+estimateStatePrivateInvestment <- function(year) {
+  US_Summary_Use <- get(paste("Summary_Use", year, "PRO_BeforeRedef", sep = "_"))*1E6
+  US_PrivateInvestment <- US_Summary_Use[Commodities, c(InvestmentDemandCodes, ChangeInventories), drop = FALSE]
+  # Separate US_PrivateInvestment into Residential (F02R) and NonResidential (F02S, F02E, F02N, and F030)
+  US_ResidentialInvestment <- US_PrivateInvestment[Commodities, "F02R", drop = FALSE]
+  US_NonResidentialInvestment <- US_PrivateInvestment[Commodities, colnames(US_PrivateInvestment)!="F02R"]
+  # Apply state PCE ratio to F02R.
+  # Generate state PCE ratio
+  PCE_ratio <- calculateStateUSPCERatio(year)
+  # Apply state Gross Output ratio to F02S, F02E, F02N, and F030
+  # Generate state Commodity Output ratio
+  GrossOutput_ratio <- calculateStateCommodityOutputRatio(year)
+  # Calculate state Private Investment (Residential and NonResidential)
+  State_ResidentialInvestment <- data.frame()
+  State_NonResidentialInvestment <- data.frame()
+  for (state in unique(PCE_ratio$State)) {
+    # Residential
+    ResidentialInvestment <- US_ResidentialInvestment * PCE_ratio[PCE_ratio$State==state, "Ratio"]
+    rownames(ResidentialInvestment) <- paste(rownames(ResidentialInvestment), state, sep = ".")
+    State_ResidentialInvestment <- rbind.data.frame(State_ResidentialInvestment, ResidentialInvestment)
+    # NonResidential
+    NonResidentialInvestment <- US_NonResidentialInvestment * GrossOutput_ratio[GrossOutput_ratio$State==state, "Ratio"]
+    rownames(NonResidentialInvestment) <- paste(rownames(NonResidentialInvestment), state, sep = ".")
+    State_NonResidentialInvestment <- rbind.data.frame(State_NonResidentialInvestment, NonResidentialInvestment)
+  }
+  # Assemble State Residential and NonResidential Private Investment
+  State_PrivateInvestment <- cbind(State_ResidentialInvestment, State_NonResidentialInvestment)
+  State_PrivateInvestment <- State_PrivateInvestment[, colnames(US_PrivateInvestment)]
+  return(State_PrivateInvestment)
+}
+
 #' Calculate state S&L government expenditure ratio at BEA Summary level.
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains state S&L government expenditure ratio for all states at a specific year at BEA Summary level.
