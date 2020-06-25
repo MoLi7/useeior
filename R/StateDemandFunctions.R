@@ -181,7 +181,7 @@ estimateStatePrivateInvestment <- function(year) {
   # Apply state PCE ratio to F02R.
   # Generate state PCE ratio
   PCE_ratio <- calculateStateUSPCERatio(year)
-  # Apply state Gross Output ratio to F02S, F02E, F02N, and F030
+  # Apply state Commodity Output ratio to F02S, F02E, F02N, and F030
   # Generate state Commodity Output ratio
   GrossOutput_ratio <- calculateStateCommodityOutputRatio(year)
   # Calculate state Private Investment (Residential and NonResidential)

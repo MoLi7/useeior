@@ -2,7 +2,7 @@
 % Please edit documentation in R/StateDemandFunctions.R
 \name{estimateStatePrivateInvestment}
 \alias{estimateStatePrivateInvestment}
-\title{Calculate state private investment at BEA Summary level.
+\title{Estimate state private investment at BEA Summary level.
 Apply state PCE ratio to F02R.
 Apply state Gross Output ratio to F02S, F02E, F02N, and F030.}
 \usage{
@@ -15,7 +15,7 @@ estimateStatePrivateInvestment(year)
 A data frame contains state household demand for all states at a specific year at BEA Summary level.
 }
 \description{
-Calculate state private investment at BEA Summary level.
+Estimate state private investment at BEA Summary level.
 Apply state PCE ratio to F02R.
 Apply state Gross Output ratio to F02S, F02E, F02N, and F030.
 }
