@@ -39,13 +39,13 @@ colnames(State_Summary_UseTransaction) <- colnames(US_Summary_UseTransaction)
 
 #' 6 - Validate if state totals == national total
 # Row sum
-rowSums(State_Summary_UseTransaction) - rowSums(US_Summary_UseTransaction)
+rowsum_validation <- rowSums(State_Summary_UseTransaction) - rowSums(US_Summary_UseTransaction)
 # Column sum
 State_CommInputTotal_list <- list()
 for (industry in colnames(US_Summary_UseTransaction)) {
-  State_CommInputTotal_list[[industry]] <- sum(State_Summary_UseTransaction[, paste(states, industry, sep = ".")])
+  State_CommInputTotal_list[[industry]] <- sum(State_Summary_UseTransaction[paste(states, industry, sep = "."), ])
 }
-unlist(State_CommInputTotal_list) - colSums(US_Summary_UseTransaction)
+colsum_validation <- unlist(State_CommInputTotal_list) - colSums(US_Summary_UseTransaction)
 
 #' 7 - For each state, append detailed Value Added to the end of Use table
 State_Value_Added <- assembleStateValueAdded(year)
@@ -57,18 +57,27 @@ State_PCE <- estimateStateHouseholdDemand(year)
 State_PCE[, "BEA_2012_Summary_Code"] <- gsub("\\..*", "", rownames(State_PCE))
 State_PCE[, "State"] <- gsub(".*\\.", "", rownames(State_PCE))
 State_PCE <- reshape2::dcast(State_PCE, BEA_2012_Summary_Code ~ State, value.var = "F010")
-m0 <- State_PCE[, -1]
-t_r <- US_Summary_Use[, "F010"]
-t_c <- as.numeric(colSums(US_Summary_MakeTransaction))
+rownames(State_PCE) <- State_PCE$BEA_2012_Summary_Code
+m0 <- as.matrix(State_PCE[rownames(US_Summary_UseTransaction), -1])
+t_r <- US_Summary_Use[rownames(US_Summary_UseTransaction), "F010"]
+t_c <- as.numeric(calculateStateTotalPCE(year)[colnames(m0), ])
 # Adjust t_c/t_r, make sum(t_c)==sum(t_r)
 if (sum(t_c) > sum(t_r)) {
   t_r <- (t_r/sum(t_r))*sum(t_c)
 } else {
   t_c <- (t_c/sum(t_c))*sum(t_r)
 }
-t <- ToleranceforRAS(t_r, t_c, NULL, 1E6)
-State_Summary_MakeTransaction_balanced <- RAS(m0, t_r, t_c, t, max_itr = 1E6)
-colnames(State_Summary_MakeTransaction_balanced) <- colnames(m0)
+t <- setToleranceforRAS(t_r, t_c, NULL, 1E6)
+State_PCE_balanced <- as.data.frame(RAS(m0, t_r, t_c, t, max_itr = 1E6))
+colnames(State_PCE_balanced) <- colnames(m0)
+# Convert State_PCE_balanced from a commodity x state matrix to a long df
+State_PCE_balanced$BEA_2012_Summary_Code <- rownames(State_PCE_balanced)
+State_PCE_balanced <- reshape2::melt(State_PCE_balanced, id.vars = "BEA_2012_Summary_Code")
+rownames(State_PCE_balanced) <- paste(State_PCE_balanced$BEA_2012_Summary_Code,
+                                      State_PCE_balanced$variable, sep = ".")
+State_PCE_balanced <- State_PCE_balanced[, "value", drop = FALSE]
+colnames(State_PCE_balanced) <- "F010"
 
-#' 9 - Apply RAS to state and local gov expenditure
-#' 10 - Apply RAS to federal gov expenditure
+#' 9 - Apply RAS to federal gov expenditure
+
+

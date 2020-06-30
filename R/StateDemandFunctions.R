@@ -39,10 +39,20 @@ getStateTax <- function(year) {
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains state GOS for all states at a specific year.
 getStateGOS <- function(year) {
-  # Load pre-saved state Tax 2007-2017
+  # Load pre-saved state GOS 2007-2017
   StateGOS <- useeior::State_GOS_2007_2017
   StateGOS <- StateGOS[, c("GeoName", "LineCode", as.character(year))]
   return(StateGOS)
+}
+
+#' Get commodity-level Personal Consumption Expenditure (PCE) for all states at a specific year.
+#' @param year A numeric value between 2007 and 2017 specifying the year of interest.
+#' @return A data frame contains state PCE for all states at a specific year.
+getStatePCE <- function(year) {
+  # Load pre-saved state PCE 2007-2018
+  StatePCE <- useeior::State_PCE_2007_2018
+  StatePCE <- StatePCE[, c("GeoName", "Line", as.character(year))]
+  return(StatePCE)
 }
 
 #' Calculate state-US Commodity Output ratios at BEA Summary level.
@@ -100,12 +110,31 @@ assembleStateValueAdded <- function(year) {
   return (StateValueAdded)
 }
 
+#' Calculate state total PCE (personal consumption expenditures) at BEA Summary level.
+#' @param year A numeric value between 2007 and 2017 specifying the year of interest.
+#' @return A data frame contains ratios of statetotal PCE for all states at a specific year at BEA Summary level.
+calculateStateTotalPCE <- function(year) {
+  # Load state PCE
+  StatePCE <- getStatePCE(year)
+  # Extract total PCE
+  StateTotalPCE <- StatePCE[StatePCE$Line==1, ]
+  rownames(StateTotalPCE) <- StateTotalPCE$GeoName
+  StateTotalPCE <- StateTotalPCE[, as.character(year), drop = FALSE]
+  # Load US PCE from state PCE table
+  PCEtable <- utils::read.table("inst/extdata/SAEXP/SAEXP1__ALL_AREAS_1997_2018.csv", sep = ",",
+                                header = TRUE, stringsAsFactors = FALSE, check.names = FALSE, fill = TRUE)
+  USPCE <- sum(PCEtable[PCEtable$GeoName=="United States" & PCEtable$Line==1, as.character(year)])*1E6
+  # Calculate PCE total in Overseas and append it to the state total table
+  StateTotalPCE["Overseas", as.character(year)] <- USPCE - sum(StateTotalPCE[, as.character(year)])
+  return(StateTotalPCE)
+}
+
 #' Calculate state-US PCE (personal consumption expenditures) ratios at BEA Summary level.
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains ratios of state/US PCE for all states at a specific year at BEA Summary level.
 calculateStateUSPCERatio <- function(year) {
-  # Calculate PCE for Overseas
-  StatePCE <- get("State_PCE_2007_2018")[, c("GeoName", "Line", as.character(year))]
+  # Load state PCE
+  StatePCE <- getStatePCE(year)
   # Generate sum of state PCE
   StatePCE_sum <- stats::aggregate(StatePCE[, as.character(year)], by = list(StatePCE$Line), sum)
   colnames(StatePCE_sum) <- c("Line", as.character(year))
