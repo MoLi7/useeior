@@ -75,9 +75,9 @@ for (linecode in c("35", "57", "84", "86")) {
   m0 <- as.matrix(EstimatedStateIndustryOutput[BEA_sectors, ])
   # Apply RAS balancing
   if (linecode=="35") {
-    t <- ToleranceforRAS(t_r, t_c, NULL, 0)
+    t <- setToleranceforRAS(t_r, t_c, NULL, 0)
   } else {
-    t <- ToleranceforRAS(t_r, t_c, NULL, 1)
+    t <- setToleranceforRAS(t_r, t_c, NULL, 1)
   }
   m <- RAS(m0, t_r, t_c, t, max_itr = 1E6)
   # Re-calculate state_US_VA_ratio for the disaggregated sectors
@@ -160,7 +160,7 @@ if (sum(t_c) > sum(t_r)) {
 } else {
   t_c <- (t_c/sum(t_c))*sum(t_r)
 }
-t <- ToleranceforRAS(t_r, t_c, NULL, 1E6)
+t <- setToleranceforRAS(t_r, t_c, NULL, 1E6)
 State_Summary_MakeTransaction_balanced <- RAS(m0, t_r, t_c, t, max_itr = 1E6)
 colnames(State_Summary_MakeTransaction_balanced) <- colnames(m0)
 

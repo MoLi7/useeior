@@ -93,7 +93,7 @@ calculateOutputRatio <- function (model, output_type="Commodity") {
 
 #' Calculate tolerance for RAS. Takes a target row sum vector and target colsum vector.
 #' Specify either relative difference or absolute difference .
-ToleranceforRAS <- function(t_r, t_c, relative_diff = NULL, absolute_diff = NULL) {
+setToleranceforRAS <- function(t_r, t_c, relative_diff = NULL, absolute_diff = NULL) {
   if (!is.null(relative_diff)) {
     t <- relative_diff
   } else if (!is.null(absolute_diff)) {
