@@ -54,30 +54,36 @@ State_Summary_Use <- State_Summary_Use[order(rownames(State_Summary_Use)), ]
 
 #' 8 - Apply RAS to PCE
 State_PCE <- estimateStateHouseholdDemand(year)
-State_PCE[, "BEA_2012_Summary_Code"] <- gsub("\\..*", "", rownames(State_PCE))
-State_PCE[, "State"] <- gsub(".*\\.", "", rownames(State_PCE))
+State_PCE[, "BEA_2012_Summary_Code"] <- gsub(".*\\.", "", rownames(State_PCE))
+State_PCE[, "State"] <- gsub("\\..*", "", rownames(State_PCE))
 State_PCE <- reshape2::dcast(State_PCE, BEA_2012_Summary_Code ~ State, value.var = "F010")
 rownames(State_PCE) <- State_PCE$BEA_2012_Summary_Code
+# Set m0, t_r and t_c
 m0 <- as.matrix(State_PCE[rownames(US_Summary_UseTransaction), -1])
 t_r <- US_Summary_Use[rownames(US_Summary_UseTransaction), "F010"]
 t_c <- as.numeric(calculateStateTotalPCE(year)[colnames(m0), ])
-# Adjust t_c/t_r, make sum(t_c)==sum(t_r)
-if (sum(t_c) > sum(t_r)) {
-  t_r <- (t_r/sum(t_r))*sum(t_c)
-} else {
-  t_c <- (t_c/sum(t_c))*sum(t_r)
-}
-t <- setToleranceforRAS(t_r, t_c, NULL, 1E6)
-State_PCE_balanced <- as.data.frame(RAS(m0, t_r, t_c, t, max_itr = 1E6))
+# Apply RAS
+State_PCE_balanced <- as.data.frame(applyRAS(m0, t_r, t_c, relative_diff = NULL,
+                                             absolute_diff = 1E6, max_itr = 1E6))
 colnames(State_PCE_balanced) <- colnames(m0)
+
 # Convert State_PCE_balanced from a commodity x state matrix to a long df
 State_PCE_balanced$BEA_2012_Summary_Code <- rownames(State_PCE_balanced)
 State_PCE_balanced <- reshape2::melt(State_PCE_balanced, id.vars = "BEA_2012_Summary_Code")
-rownames(State_PCE_balanced) <- paste(State_PCE_balanced$BEA_2012_Summary_Code,
-                                      State_PCE_balanced$variable, sep = ".")
+rownames(State_PCE_balanced) <- paste(State_PCE_balanced$variable,
+                                      State_PCE_balanced$BEA_2012_Summary_Code, sep = ".")
 State_PCE_balanced <- State_PCE_balanced[, "value", drop = FALSE]
 colnames(State_PCE_balanced) <- "F010"
 
 #' 9 - Apply RAS to federal gov expenditure
 
-
+#' 10 - Assemble final demand columns
+StateFinalDemand <- cbind(State_PCE_balanced,
+                          estimateStatePrivateInvestment(year),
+                          # state exports
+                          # state imports
+                          # state fed gov expenditure
+                          estimateStateSLGovExpenditure(year))
+# Append value added rows to final demand
+StateFinalDemand[rownames(State_Value_Added), ] <- 0
+State_Summary_Use <- cbind(State_Summary_Use, StateFinalDemand[rownames(State_Summary_Use), ])
