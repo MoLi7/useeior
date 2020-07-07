@@ -93,49 +93,50 @@ AdjustGDPComponent <- function(year, return) {
   
   #join into one table
   compareTable <- gdp %>% 
-    left_join(., comp, by=c('GeoName','LineCode')) %>% 
-    left_join(., tax, by=c('GeoName','LineCode')) %>%
-    left_join(., gos, by=c('GeoName','LineCode')) 
-  colnames(compareTable)[3:6] <- c('trueGDP','comp','tax','gos')
+    dplyr::left_join(., comp, by=c('GeoName','LineCode')) %>% 
+    dplyr::left_join(., tax, by=c('GeoName','LineCode')) %>%
+    dplyr::left_join(., gos, by=c('GeoName','LineCode')) 
+  colnames(compareTable)[3:6] <- c('GDP','EmpCompensation','Tax','GOS')
   
-  #adjust NA in tax (simple, add/subtract)
-  compareTable[is.na(compareTable$tax),]$tax <- compareTable[is.na(compareTable$tax),]$trueGDP - 
-    compareTable[is.na(compareTable$tax),]$comp - 
-    compareTable[is.na(compareTable$tax),]$gos
+  #adjust NA in Tax (simple, add/subtract)
+  compareTable[is.na(compareTable$Tax),]$Tax <- compareTable[is.na(compareTable$Tax),]$GDP - 
+    compareTable[is.na(compareTable$Tax),]$EmpCompensation - 
+    compareTable[is.na(compareTable$Tax),]$GOS
   
   #adjust NA in gdp (simple, add/subtract)
-  compareTable[is.na(compareTable$trueGDP),]$trueGDP <- compareTable[is.na(compareTable$trueGDP),]$tax +
-    compareTable[is.na(compareTable$trueGDP),]$comp + 
-    compareTable[is.na(compareTable$trueGDP),]$gos
+  compareTable[is.na(compareTable$GDP),]$GDP <- compareTable[is.na(compareTable$GDP),]$Tax +
+    compareTable[is.na(compareTable$GDP),]$EmpCompensation + 
+    compareTable[is.na(compareTable$GDP),]$GOS
   
   #adjust NA in EmpComp and GOS 
   ## Step 1: calculate EmpComp-GDP ratio and GOS-GDP ratio for each LineCode
   ratioTable <- compareTable %>% na.omit() %>% 
-    mutate(compRatio = comp / trueGDP, gosRatio = gos / trueGDP) %>% na.omit() %>%
-    group_by(LineCode) %>%
-    summarise(avgCompRatio = mean(compRatio), avggosRatio = mean(gosRatio))
+    dplyr::mutate(compRatio = EmpCompensation / GDP, gosRatio = GOS / GDP) %>% na.omit() %>%
+    dplyr::group_by(LineCode) %>%
+    dplyr::summarise(avgCompRatio = mean(compRatio), avgGOSRatio = mean(gosRatio))
   ## Step 2: assign new EmpComp and GOS value to NAs
   position <- which(is.na(compareTable$comp) == TRUE)
   for (i in position) {
-    if (compareTable$trueGDP[i] != 0) {
-      compareTable$comp[i] <- compareTable$trueGDP[i] * ratioTable[ratioTable$LineCode == compareTable$LineCode[i],]$avgCompRatio
-      compareTable$gos[i] <- compareTable$trueGDP[i] * ratioTable[ratioTable$LineCode == compareTable$LineCode[i],]$avggosRatio
-    } else if (compareTable$trueGDP[i] == 0) {
-      compareTable$comp[i] <- 0
-      compareTable$gos[i] <- 0
+    if (compareTable$GDP[i] != 0) {
+      compareTable$EmpCompensation[i] <- compareTable$GDP[i] * ratioTable[ratioTable$LineCode == compareTable$LineCode[i],]$avgCompRatio
+      compareTable$GOS[i] <- compareTable$GDP[i] * ratioTable[ratioTable$LineCode == compareTable$LineCode[i],]$avgGOSRatio
+    } else if (compareTable$GDP[i] == 0) {
+      compareTable$EmpCompensation[i] <- 0
+      compareTable$GOS[i] <- 0
     }
   }
   ## Step 3: check row rum and apply adjustment factor to estiamted rows 
-  compareTable <- compareTable %>% mutate(dif = trueGDP - comp - tax - gos, errorRate = abs(dif) / trueGDP)
-  shrinkfactor <- 1.0 + compareTable$dif[position] / (compareTable$comp[position] + compareTable$gos[position])
-  compareTable$comp[position] <- compareTable$comp[position]*shrinkfactor
-  compareTable$gos[position] <- compareTable$gos[position]*shrinkfactor
+  compareTable <- compareTable %>% dplyr::mutate(dif = GDP - EmpCompensation - Tax - GOS, errorRate = abs(dif) / GDP)
+  shrinkfactor <- 1.0 + compareTable$dif[position] / (compareTable$EmpCompensation[position] + compareTable$GOS[position])
+  compareTable$EmpCompensation[position] <- compareTable$EmpCompensation[position]*shrinkfactor
+  compareTable$GOS[position] <- compareTable$GOS[position]*shrinkfactor
   
-  compareTable <- compareTable %>% mutate(dif = trueGDP - comp - tax - gos, errorRate = abs(dif) / trueGDP) # recompute errorRate
+  compareTable <- compareTable %>% dplyr::mutate(dif = GDP - EmpCompensation - Tax - GOS, errorRate = abs(dif) / GDP) # recompute errorRate
   
   #Output
-  switch_return <- switch(return, 'comp'= 1, 'tax'=2,'gos'=3)
-  output <- compareTable %>% select(1,2, switch_return + 3)
+  switch_return <- switch(return, 'GDP'=1, 'EmpCompensation'=2, 'Tax'=3, 'GOS'=4)
+  output <- compareTable %>% dplyr::select(1, 2, switch_return + 2)
+  colnames(output)[3] <- as.character(year)
   return(output)
 }
 

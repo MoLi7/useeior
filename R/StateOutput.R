@@ -13,15 +13,8 @@ getStateGDP <- function(year) {
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains state value for all states with row names being BEA sector code.
 mapStateTabletoBEASummary <- function(statetablename, year) {
-  if (statetablename=="GDP") {
-    StateTable <- getStateGDP(year)
-  } else if (statetablename=="EmpCompensation") {
-    StateTable <- getStateEmpCompensation(year)
-  } else if (statetablename=="Tax") {
-    StateTable <- getStateTax(year)
-  } else if (statetablename=="GOS") {
-    StateTable <- getStateGOS(year)
-  }
+  # Load and adjust State tables
+  StateTable <- AdjustGDPComponent(year, statetablename)
   # Load State GDP to BEA Summary sector-mapping table
   BEAStateGDPtoBEASummary <- utils::read.table(system.file("extdata", "Crosswalk_StateGDPtoBEASummaryIO2012Schema.csv", package = "useeior"),
                                                sep = ",", header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
