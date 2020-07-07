@@ -190,7 +190,7 @@ estimateStateHouseholdDemand <- function(year) {
   State_HouseholdDemand <- data.frame()
   for (state in unique(State_PCE_ratio$State)) {
     HouseholdDemand <- US_HouseholdDemand * State_PCE_ratio[State_PCE_ratio$State==state, "Ratio"]
-    rownames(HouseholdDemand) <- paste(rownames(HouseholdDemand), state, sep = ".")
+    rownames(HouseholdDemand) <- paste(state, rownames(HouseholdDemand), sep = ".")
     State_HouseholdDemand <- rbind.data.frame(State_HouseholdDemand, HouseholdDemand)
   }
   return(State_HouseholdDemand)
@@ -219,17 +219,33 @@ estimateStatePrivateInvestment <- function(year) {
   for (state in unique(PCE_ratio$State)) {
     # Residential
     ResidentialInvestment <- US_ResidentialInvestment * PCE_ratio[PCE_ratio$State==state, "Ratio"]
-    rownames(ResidentialInvestment) <- paste(rownames(ResidentialInvestment), state, sep = ".")
+    rownames(ResidentialInvestment) <- paste(state, rownames(ResidentialInvestment), sep = ".")
     State_ResidentialInvestment <- rbind.data.frame(State_ResidentialInvestment, ResidentialInvestment)
     # NonResidential
     NonResidentialInvestment <- US_NonResidentialInvestment * GrossOutput_ratio[GrossOutput_ratio$State==state, "Ratio"]
-    rownames(NonResidentialInvestment) <- paste(rownames(NonResidentialInvestment), state, sep = ".")
+    rownames(NonResidentialInvestment) <- paste(state, rownames(NonResidentialInvestment), sep = ".")
     State_NonResidentialInvestment <- rbind.data.frame(State_NonResidentialInvestment, NonResidentialInvestment)
   }
   # Assemble State Residential and NonResidential Private Investment
   State_PrivateInvestment <- cbind(State_ResidentialInvestment, State_NonResidentialInvestment)
   State_PrivateInvestment <- State_PrivateInvestment[, colnames(US_PrivateInvestment)]
   return(State_PrivateInvestment)
+}
+
+#' Estimate state export at BEA Summary level.
+#' @param year A numeric value between 2007 and 2017 specifying the year of interest.
+#' @return A data frame contains state export for all states at a specific year at BEA Summary level.
+estimateStateExport <- function(year) {
+  
+  
+}
+
+#' Estimate state import at BEA Summary level.
+#' @param year A numeric value between 2007 and 2017 specifying the year of interest.
+#' @return A data frame contains state import for all states at a specific year at BEA Summary level.
+estimateStateImport <- function(year) {
+  US_Summary_Import <- get(paste("Summary_Import", year, "BeforeRedef", sep = "_"))*1E6
+  
 }
 
 #' Calculate state S&L government expenditure ratio at BEA Summary level.
@@ -284,7 +300,9 @@ estimateStateSLGovExpenditure <- function(year) {
     State_SLGovExp_state[, SLGovernmentDemandCodes] <- State_SLGovExp_state[, paste0(SLGovernmentDemandCodes, ".x")] *
       State_SLGovExp_state[, paste0(SLGovernmentDemandCodes, ".y")]
     # Modify rownames
-    rownames(State_SLGovExp_state) <- paste(State_SLGovExp_state$BEA_2012_Summary_Code, state, sep = ".")
+    rownames(State_SLGovExp_state) <- State_SLGovExp_state$BEA_2012_Summary_Code
+    State_SLGovExp_state <- State_SLGovExp_state[rownames(US_SLGovExp), ]
+    rownames(State_SLGovExp_state) <- paste(state, rownames(State_SLGovExp_state), sep = ".")
     State_SLGovExp <- rbind.data.frame(State_SLGovExp, State_SLGovExp_state[, SLGovernmentDemandCodes])
   }
   return(State_SLGovExp)
