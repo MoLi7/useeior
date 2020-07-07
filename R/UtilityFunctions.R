@@ -141,6 +141,21 @@ RAS <- function(m0, t_r, t_c, t, max_itr = 1E6) {
   return(m)
 }
 
+#' Integrate pre-adjustment of t_r, t_c and t (tolerance level) with RAS function.
+applyRAS <- function(m0, t_r, t_c, relative_diff, absolute_diff, max_itr) {
+  # Adjust t_c/t_r, make sum(t_c)==sum(t_r)
+  if (sum(t_c) > sum(t_r)) {
+    t_r <- (t_r/sum(t_r))*sum(t_c)
+  } else {
+    t_c <- (t_c/sum(t_c))*sum(t_r)
+  }
+  # Generate t for RAS
+  t <- setToleranceforRAS(t_r, t_c, relative_diff, absolute_diff)
+  # Apply RAS
+  m <- RAS(m0, t_r, t_c, t, max_itr)
+  return(m)
+}
+
 #' Compare two matrices, calculate percentage difference (m1-m2)/m1.
 #' Dimensions of the two matrices must be the same.
 compareMatrices <- function(m1, m2, percentage_diff = FALSE) {
