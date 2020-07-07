@@ -80,6 +80,65 @@ calculateStateCommodityOutputRatio <- function(year) {
   return(State_CommodityOutputRatio)
 }
 
+#' Adjust EmpComp, Tax, and GOS to fill NA and make them consistent with GDP
+#' @param year A numeric value between 2007 and 2017 specifying the year of interest.
+#' @param return A character string showing which attribute to return. 'comp', 'tax', 'gos'
+#' @return A data frame contains adjusted EmpComp, Tax, GOS, and GDP
+AdjustGDPComponent <- function(year, return) {
+  #load data
+  gdp <- getStateGDP(year)
+  comp <- getStateEmpCompensation(year)
+  tax <- getStateTax(year)
+  gos <- getStateGOS(year)
+  
+  #join into one table
+  compareTable <- gdp %>% 
+    left_join(., comp, by=c('GeoName','LineCode')) %>% 
+    left_join(., tax, by=c('GeoName','LineCode')) %>%
+    left_join(., gos, by=c('GeoName','LineCode')) 
+  colnames(compareTable)[3:6] <- c('trueGDP','comp','tax','gos')
+  
+  #adjust NA in tax (simple, add/subtract)
+  compareTable[is.na(compareTable$tax),]$tax <- compareTable[is.na(compareTable$tax),]$trueGDP - 
+    compareTable[is.na(compareTable$tax),]$comp - 
+    compareTable[is.na(compareTable$tax),]$gos
+  
+  #adjust NA in gdp (simple, add/subtract)
+  compareTable[is.na(compareTable$trueGDP),]$trueGDP <- compareTable[is.na(compareTable$trueGDP),]$tax +
+    compareTable[is.na(compareTable$trueGDP),]$comp + 
+    compareTable[is.na(compareTable$trueGDP),]$gos
+  
+  #adjust NA in EmpComp and GOS 
+  ## Step 1: calculate EmpComp-GDP ratio and GOS-GDP ratio for each LineCode
+  ratioTable <- compareTable %>% na.omit() %>% 
+    mutate(compRatio = comp / trueGDP, gosRatio = gos / trueGDP) %>% na.omit() %>%
+    group_by(LineCode) %>%
+    summarise(avgCompRatio = mean(compRatio), avggosRatio = mean(gosRatio))
+  ## Step 2: assign new EmpComp and GOS value to NAs
+  position <- which(is.na(compareTable$comp) == TRUE)
+  for (i in position) {
+    if (compareTable$trueGDP[i] != 0) {
+      compareTable$comp[i] <- compareTable$trueGDP[i] * ratioTable[ratioTable$LineCode == compareTable$LineCode[i],]$avgCompRatio
+      compareTable$gos[i] <- compareTable$trueGDP[i] * ratioTable[ratioTable$LineCode == compareTable$LineCode[i],]$avggosRatio
+    } else if (compareTable$trueGDP[i] == 0) {
+      compareTable$comp[i] <- 0
+      compareTable$gos[i] <- 0
+    }
+  }
+  ## Step 3: check row rum and apply adjustment factor to estiamted rows 
+  compareTable <- compareTable %>% mutate(dif = trueGDP - comp - tax - gos, errorRate = abs(dif) / trueGDP)
+  shrinkfactor <- 1.0 + compareTable$dif[position] / (compareTable$comp[position] + compareTable$gos[position])
+  compareTable$comp[position] <- compareTable$comp[position]*shrinkfactor
+  compareTable$gos[position] <- compareTable$gos[position]*shrinkfactor
+  
+  compareTable <- compareTable %>% mutate(dif = trueGDP - comp - tax - gos, errorRate = abs(dif) / trueGDP) # recompute errorRate
+  
+  #Output
+  switch_return <- switch(return, 'comp'= 1, 'tax'=2,'gos'=3)
+  output <- compareTable %>% select(1,2, switch_return + 3)
+  return(output)
+}
+
 #' Assemble Summary-level value added sectors (V001, V002, V003) for all states at a specific year.
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains Summary-level value added (V001, V002, V003) for all states at a specific year.
