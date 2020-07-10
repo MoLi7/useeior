@@ -245,13 +245,24 @@ estimateStateHouseholdDemand <- function(year) {
   # Extract US Household Demand
   US_HouseholdDemand <- US_Summary_Use[Commodities, HouseholdDemandCodes, drop = FALSE]
   # Generate State_PCE_ratio
-  State_PCE_ratio <- calculateStateUSPCERatio(year)
+  PCE_ratio <- calculateStateUSPCERatio(year)
   # Calculate State_HouseholdDemand
   State_HouseholdDemand <- data.frame()
-  for (state in unique(State_PCE_ratio$State)) {
-    HouseholdDemand <- US_HouseholdDemand * State_PCE_ratio[State_PCE_ratio$State==state, "Ratio"]
+  for (state in unique(PCE_ratio$State)) {
+    # Merge PCE_ratio with US_HouseholdDemand to keep all commodities
+    HouseholdDemand <- merge(US_HouseholdDemand, PCE_ratio[PCE_ratio$State==state, ],
+                             by.x = 0, by.y = "BEA_2012_Summary_Code", all.x = TRUE)
+    # Calculate state HouseholdDemand
+    HouseholdDemand$F010 <- HouseholdDemand$F010*HouseholdDemand$Ratio
+    # Replace NA with zero
+    HouseholdDemand[is.na(HouseholdDemand$F010), "F010"] <- 0
+    # Assign rownames
+    rownames(HouseholdDemand) <- HouseholdDemand$Row.names
+    # Re-order table
+    HouseholdDemand <- HouseholdDemand[rownames(US_HouseholdDemand), ]
+    # Add state name to rownames
     rownames(HouseholdDemand) <- paste(state, rownames(HouseholdDemand), sep = ".")
-    State_HouseholdDemand <- rbind.data.frame(State_HouseholdDemand, HouseholdDemand)
+    State_HouseholdDemand <- rbind.data.frame(State_HouseholdDemand, HouseholdDemand[, "F010", drop = FALSE])
   }
   return(State_HouseholdDemand)
 }
@@ -272,17 +283,20 @@ estimateStatePrivateInvestment <- function(year) {
   PCE_ratio <- calculateStateUSPCERatio(year)
   # Apply state Commodity Output ratio to F02S, F02E, F02N, and F030
   # Generate state Commodity Output ratio
-  GrossOutput_ratio <- calculateStateCommodityOutputRatio(year)
+  CommodityOutput_ratio <- calculateStateCommodityOutputRatio(year)
   # Calculate state Private Investment (Residential and NonResidential)
   State_ResidentialInvestment <- data.frame()
   State_NonResidentialInvestment <- data.frame()
   for (state in unique(PCE_ratio$State)) {
     # Residential
+    State_PCE_ratio <- PCE_ratio[PCE_ratio$State==state, ]
+    rownames(State_PCE_ratio) <- State_PCE_ratio$BEA_2012_Summary_Code
+    State_PCE_ratio[!rownames(US_ResidentialInvestment)%in%rownames(State_PCE_ratio), "Ratio"] <- 0
     ResidentialInvestment <- US_ResidentialInvestment * PCE_ratio[PCE_ratio$State==state, "Ratio"]
     rownames(ResidentialInvestment) <- paste(state, rownames(ResidentialInvestment), sep = ".")
     State_ResidentialInvestment <- rbind.data.frame(State_ResidentialInvestment, ResidentialInvestment)
     # NonResidential
-    NonResidentialInvestment <- US_NonResidentialInvestment * GrossOutput_ratio[GrossOutput_ratio$State==state, "Ratio"]
+    NonResidentialInvestment <- US_NonResidentialInvestment * CommodityOutput_ratio[CommodityOutput_ratio$State==state, "Ratio"]
     rownames(NonResidentialInvestment) <- paste(state, rownames(NonResidentialInvestment), sep = ".")
     State_NonResidentialInvestment <- rbind.data.frame(State_NonResidentialInvestment, NonResidentialInvestment)
   }
@@ -296,16 +310,46 @@ estimateStatePrivateInvestment <- function(year) {
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
 #' @return A data frame contains state export for all states at a specific year at BEA Summary level.
 estimateStateExport <- function(year) {
-  
-  
+  # Load US Summary Use table
+  US_Summary_Use <- get(paste("Summary_Use", year, "PRO_BeforeRedef", sep = "_"))*1E6
+  # Extract US Export
+  US_Export <- US_Summary_Use[Commodities, ExportCodes, drop = FALSE]
+  # Calculate state export
+  State_Export <- data.frame()
+  for (state in c(state.name, "Disctrict of Columbia")) {
+    # Generate State_export_ratio
+    State_export_ratio <- calculateCensusForeignCommodityFlowRatios(state, year, "export", 2012, "Summary")
+    # Generate state Commodity Output ratio
+    CommodityOutput_ratio <- calculateStateCommodityOutputRatio(year)
+    # For commodities that are not covered by Census data, use Commodity Output ratio instead
+    State_export_ratio <- merge(State_export_ratio[, c("BEA_2012_Summary_Code", "SoITradeRatio")],
+                                CommodityOutput_ratio[CommodityOutput_ratio$State==state, ],
+                                by = "BEA_2012_Summary_Code", all.y = TRUE)
+    State_export_ratio[is.na(State_export_ratio$SoITradeRatio), "SoITradeRatio"] <- State_export_ratio[is.na(State_export_ratio$SoITradeRatio), "Ratio"]
+    rownames(State_export_ratio) <- State_export_ratio$BEA_2012_Summary_Code
+    # Calculate state export
+    Export <- US_Export * State_export_ratio[rownames(US_Export), "SoITradeRatio"]
+    rownames(Export) <- paste(state, rownames(Export), sep = ".")
+    State_Export <- rbind.data.frame(State_Export, Export)
+  }
+  # Add Overseas to the table
+  State_Export[paste("Overseas", rownames(US_Export), sep = "."), ] <- 0
+  return(State_Export)
 }
 
-#' Estimate state import at BEA Summary level.
+#' Calculate US Import Ratio (matrix) at BEA Summary level.
 #' @param year A numeric value between 2007 and 2017 specifying the year of interest.
-#' @return A data frame contains state import for all states at a specific year at BEA Summary level.
-estimateStateImport <- function(year) {
+#' @return A data frame contains US Import Ratio (matrix) at a specific year at BEA Summary level.
+calculateUSImportRatioMatrix <- function(year) {
+  # Load US Summary Use and Import table
+  US_Summary_Use <- get(paste("Summary_Use", year, "PRO_BeforeRedef", sep = "_"))*1E6
   US_Summary_Import <- get(paste("Summary_Import", year, "BeforeRedef", sep = "_"))*1E6
-  
+  # Specify rows and columns to use
+  rows <- rownames(US_Summary_Import)
+  columns <- intersect(colnames(US_Summary_Use), colnames(US_Summary_Import))
+  # Calculate state Import ratios
+  Import_Ratio <- US_Summary_Import[rows, columns]/US_Summary_Use[rows, columns]
+  return(Import_Ratio)
 }
 
 #' Calculate state S&L government expenditure ratio at BEA Summary level.
