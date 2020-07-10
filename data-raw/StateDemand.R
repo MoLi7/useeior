@@ -47,12 +47,7 @@ for (industry in colnames(US_Summary_UseTransaction)) {
 }
 colsum_validation <- unlist(State_CommInputTotal_list) - colSums(US_Summary_UseTransaction)
 
-#' 7 - For each state, append detailed Value Added to the end of Use table
-State_Value_Added <- assembleStateValueAdded(year)
-State_Summary_Use <- rbind(State_Summary_UseTransaction, State_Value_Added)
-State_Summary_Use <- State_Summary_Use[order(rownames(State_Summary_Use)), ]
-
-#' 8 - Apply RAS to PCE
+#' 7 - Apply RAS to PCE
 State_PCE <- estimateStateHouseholdDemand(year)
 State_PCE[, "BEA_2012_Summary_Code"] <- gsub(".*\\.", "", rownames(State_PCE))
 State_PCE[, "State"] <- gsub("\\..*", "", rownames(State_PCE))
@@ -62,7 +57,7 @@ rownames(State_PCE) <- State_PCE$BEA_2012_Summary_Code
 m0 <- as.matrix(State_PCE[rownames(US_Summary_UseTransaction), -1])
 t_r <- US_Summary_Use[rownames(US_Summary_UseTransaction), "F010"]
 t_c <- as.numeric(calculateStateTotalPCE(year)[colnames(m0), ])
-# Apply RAS
+# Apply RAS, RAS converged after 1000001 iterations.
 State_PCE_balanced <- as.data.frame(applyRAS(m0, t_r, t_c, relative_diff = NULL,
                                              absolute_diff = 1E6, max_itr = 1E6))
 colnames(State_PCE_balanced) <- colnames(m0)
@@ -75,15 +70,22 @@ rownames(State_PCE_balanced) <- paste(State_PCE_balanced$variable,
 State_PCE_balanced <- State_PCE_balanced[, "value", drop = FALSE]
 colnames(State_PCE_balanced) <- "F010"
 
-#' 9 - Apply RAS to federal gov expenditure
+#' 8 - Apply RAS to federal gov expenditure
 
-#' 10 - Assemble final demand columns
+#' 9 - Assemble final demand columns
 StateFinalDemand <- cbind(State_PCE_balanced,
                           estimateStatePrivateInvestment(year),
-                          # state exports
-                          # state imports
+                          estimateStateExport(year),
                           # state fed gov expenditure
                           estimateStateSLGovExpenditure(year))
-# Append value added rows to final demand
-StateFinalDemand[rownames(State_Value_Added), ] <- 0
-State_Summary_Use <- cbind(State_Summary_Use, StateFinalDemand[rownames(State_Summary_Use), ])
+State_Summary_Use <- cbind(State_Summary_UseTransaction, StateFinalDemand[rownames(State_Summary_Use), ])
+
+#' 10 - Estimate state imports
+State_Summary_Use_Domestic <- State_Summary_Use*(1 - calculateUSImportRatioMatrix(year))
+StateImport <- rowSums(State_Summary_Use_Domestic) - rowSums(State_Summary_Use)
+
+#' Last step - For each state, append detailed Value Added to the end of Use table
+State_Value_Added <- assembleStateValueAdded(year)
+State_Summary_Use <- rbind(State_Summary_Use, State_Value_Added)
+State_Summary_Use <- State_Summary_Use[order(rownames(State_Summary_Use)), ]
+
