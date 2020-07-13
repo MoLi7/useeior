@@ -63,23 +63,16 @@ for (linecode in c("35", "57", "84", "86")) {
   # Load State GDP to BEA Summary sector-mapping table
   BEAStateGDPtoBEASummary <- utils::read.table(system.file("extdata", "Crosswalk_StateGDPtoBEASummaryIO2012Schema.csv", package = "useeior"),
                                                sep = ",", header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
-  # Adjust t_c/t_r, make sum(t_c)==sum(t_r)
-  if (sum(t_c) > sum(t_r)) {
-    t_r <- (t_r/sum(t_r))*sum(t_c)
-  } else {
-    t_c <- (t_c/sum(t_c))*sum(t_r)
-  }
   # Create m0
   EstimatedStateIndustryOutput <- do.call(cbind.data.frame, State_Summary_IndustryOutput_list)
   colnames(EstimatedStateIndustryOutput) <- names(State_Summary_IndustryOutput_list)
   m0 <- as.matrix(EstimatedStateIndustryOutput[BEA_sectors, ])
-  # Apply RAS balancing
+  # Apply RAS
   if (linecode=="35") {
-    t <- setToleranceforRAS(t_r, t_c, NULL, 0)
+    m <- applyRAS(m0, t_r, t_c, relative_diff = NULL, absolute_diff = 0, max_itr = 1E6)
   } else {
-    t <- setToleranceforRAS(t_r, t_c, NULL, 1)
+    m <- applyRAS(m0, t_r, t_c, relative_diff = NULL, absolute_diff = 1, max_itr = 1E6)
   }
-  m <- RAS(m0, t_r, t_c, t, max_itr = 1E6)
   # Re-calculate state_US_VA_ratio for the disaggregated sectors
   state_US_VA_ratio_linecode <- m/rowSums(m)
   # Replace the ratio values in state_US_VA_ratio with the re-calculated ratio
@@ -154,14 +147,7 @@ colnames(State_Summary_MakeTransaction) <- colnames(US_Summary_MakeTransaction)
 m0 <- State_Summary_MakeTransaction
 t_r <- as.numeric(unlist(State_Summary_IndustryOutput_list))
 t_c <- as.numeric(colSums(US_Summary_MakeTransaction))
-# Adjust t_c/t_r, make sum(t_c)==sum(t_r)
-if (sum(t_c) > sum(t_r)) {
-  t_r <- (t_r/sum(t_r))*sum(t_c)
-} else {
-  t_c <- (t_c/sum(t_c))*sum(t_r)
-}
-t <- setToleranceforRAS(t_r, t_c, NULL, 1E6)
-State_Summary_MakeTransaction_balanced <- RAS(m0, t_r, t_c, t, max_itr = 1E6)
+State_Summary_MakeTransaction_balanced <- applyRAS(m0, t_r, t_c, relative_diff = NULL, absolute_diff = 1E6, max_itr = 1E6)
 colnames(State_Summary_MakeTransaction_balanced) <- colnames(m0)
 
 #' 9 - Generae MarketShare matrix for US and each state
